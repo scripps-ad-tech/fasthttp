@@ -376,7 +376,7 @@ type Server struct {
 // msg to the client if there are more than Server.Concurrency concurrent
 // handlers h are running at the moment.
 func TimeoutHandler(h RequestHandler, timeout time.Duration, msg string) RequestHandler {
-	return TimeoutWithCodeHandler(h, timeout, msg, StatusRequestTimeout)
+	return TimeoutWithCodeHandler(h, timeout, msg, StatusRequestTimeout, "")
 }
 
 // TimeoutWithCodeHandler creates RequestHandler, which returns an error with
@@ -386,7 +386,7 @@ func TimeoutHandler(h RequestHandler, timeout time.Duration, msg string) Request
 // The returned handler may return StatusTooManyRequests error with the given
 // msg to the client if there are more than Server.Concurrency concurrent
 // handlers h are running at the moment.
-func TimeoutWithCodeHandler(h RequestHandler, timeout time.Duration, msg string, statusCode int) RequestHandler {
+func TimeoutWithCodeHandler(h RequestHandler, timeout time.Duration, msg string, statusCode int, contentType string) RequestHandler {
 	if timeout <= 0 {
 		return h
 	}
@@ -414,7 +414,17 @@ func TimeoutWithCodeHandler(h RequestHandler, timeout time.Duration, msg string,
 		select {
 		case <-ch:
 		case <-ctx.timeoutTimer.C:
-			ctx.TimeoutErrorWithCode(msg, statusCode)
+
+			if contentType == "" {
+				contentType = "text/plain; charset=utf-8"
+			}
+
+			var resp Response
+			resp.SetStatusCode(statusCode)
+			resp.SetBodyString(msg)
+
+			resp.Header.SetContentType(contentType)
+			ctx.TimeoutErrorWithResponse(&resp)
 		}
 		stopTimer(ctx.timeoutTimer)
 	}
